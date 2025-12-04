@@ -1,4 +1,10 @@
+using KDSA.Application.Interfaces;
+using KDSA.Infrastructure.Services;
+
 var builder = WebApplication.CreateBuilder(args);
+
+// Servisleri sisteme tanıtıyoruz (Dependency Injection)
+builder.Services.AddScoped<IGeminiService, GeminiService>();
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
