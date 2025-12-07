@@ -6,5 +6,6 @@ namespace KDSA.Application.Interfaces
     public interface IBaserowClient
     {
         Task<bool> LogDecisionAsync(AuditLogEntry entry);
+        Task<List<AuditLogEntry>> GetAuditLogsAsync();
     }
 }

@@ -44,5 +44,13 @@ namespace KDSA.API.Controllers
             var artifact = await _alexandraService.GenerateComplianceArtifactAsync(systemId);
             return Ok(artifact);
         }
+
+        // GET api/v1/compliance/logs
+        [HttpGet("logs")]
+        public async Task<IActionResult> GetAuditLogs()
+        {
+            var logs = await _alexandraService.GetFullAuditTrailAsync();
+            return Ok(logs);
+        }
     }
 }

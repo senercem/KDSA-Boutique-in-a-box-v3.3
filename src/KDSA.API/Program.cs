@@ -1,49 +1,83 @@
 using KDSA.Application.Interfaces;
 using KDSA.Infrastructure.Services;
+using Swashbuckle.AspNetCore.Swagger;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Servisleri sisteme tanıtıyoruz (Dependency Injection)
+// --- 1. CORS AYARI (Frontend Erişimi İçin Kritik) ---
+// React/Next.js uygulamanızın (localhost:5173 veya 3000) bu API'ye erişmesine izin verir.
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowReactApp",
+        policy =>
+        {
+            policy.WithOrigins("http://localhost:5173", "http://localhost:3000") // Frontend portları
+                  .AllowAnyHeader()
+                  .AllowAnyMethod();
+        });
+});
+
+// --- 2. SERVİS KAYITLARI (Dependency Injection) ---
+
+// Standart Controller servisi
+builder.Services.AddControllers();
+
+// Swagger / OpenAPI (Test arayüzü için)
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+// M2: Decision Engine (Gemini AI Servisi)
 builder.Services.AddScoped<IGeminiService, GeminiService>();
+
+// M3: Alexandra (Compliance / Governance Servisi)
 builder.Services.AddScoped<IAlexandraService, AlexandraService>();
+
+// Infrastructure: Baserow Veritabanı İstemcisi
 builder.Services.AddScoped<IBaserowClient, BaserowClient>();
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+// ACORE Modülü Servisi
+builder.Services.AddScoped<IACOREService, ACOREService>();
 
+// --- 3. UYGULAMA İNŞASI ---
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// --- 4. MIDDLEWARE AYARLARI (İstek İşleme Hattı) ---
+
+// Geliştirme ortamındaysak Swagger'ı aç
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
 
 app.UseHttpsRedirection();
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+// ÖNEMLİ: CORS middleware'i Authorization'dan ÖNCE gelmelidir.
+app.UseCors("AllowReactApp");
 
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
+app.UseAuthorization();
 
+// Controller'ları (API uçlarını) haritala
+app.MapControllers();
+
+// Controller'ları haritalarken hata olursa detayını görmek için try-catch bloğu:
+//try
+//{
+//    app.MapControllers();
+//}
+//catch (System.Reflection.ReflectionTypeLoadException ex)
+//{
+//    // Hatanın asıl sebebini konsola yazdırıyoruz
+//    foreach (var item in ex.LoaderExceptions)
+//    {
+//        if (item != null)
+//        {
+//            System.Diagnostics.Debug.WriteLine($"KRİTİK HATA: {item.Message}");
+//            Console.WriteLine($"KRİTİK HATA: {item.Message}");
+//        }
+//    }
+//    throw; // Hatayı tekrar fırlat ki uygulama dursun biz de görelim
+//}
+
+// Uygulamayı başlat
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}

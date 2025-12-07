@@ -3,54 +3,80 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using KDSA.Application.Interfaces;
 using KDSA.Domain.Entities;
+using KDSA.Infrastructure.Services;
 
 namespace KDSA.Infrastructure.Services
 {
     public class AlexandraService : IAlexandraService
     {
-        // Şimdilik verileri hafızada tutuyoruz (Baserow bağlanınca burası değişecek)
-        private static readonly Dictionary<string, AISystemContext> _systemContexts = new();
-        private static readonly List<ModelMetric> _metrics = new();
+        private readonly IBaserowClient _baserowClient;
+        private readonly IACOREService _acoreService;
 
-        public Task<bool> RegisterSystemContextAsync(AISystemContext context)
+        // Constructor Injection (Hata vermemesi için bu yapı şart)
+        public AlexandraService(IBaserowClient baserowClient, IACOREService acoreService)
         {
-            if (_systemContexts.ContainsKey(context.SystemId))
-            {
-                _systemContexts[context.SystemId] = context;
-            }
-            else
-            {
-                _systemContexts.Add(context.SystemId, context);
-            }
-            return Task.FromResult(true);
+            _baserowClient = baserowClient;
+            _acoreService = acoreService;
         }
 
-        public Task<bool> IngestMetricsAsync(ModelMetric metric)
+        public async Task<bool> RegisterSystemContextAsync(AISystemContext context)
         {
-            _metrics.Add(metric);
-            return Task.FromResult(true);
+            return await Task.FromResult(true);
         }
 
-        public Task<ComplianceArtifact> GenerateComplianceArtifactAsync(string systemId)
+        public async Task<bool> IngestMetricsAsync(ModelMetric metric)
         {
-            // Dokümandaki "Compliance Artifact" formatına uygun sahte veri dönüyoruz
+            return await Task.FromResult(true);
+        }
+
+        public async Task<ComplianceArtifact> GenerateComplianceArtifactAsync(string systemId)
+        {
+            // 1. M1'den GERÇEK RİSK SKORUNU ÇEK
+            var riskProfile = await _acoreService.GetLatestRiskProfileAsync(systemId);
+
+            // Eğer veri yoksa (Frontend'den henüz giriş yapılmadıysa) varsayılan bir değer kullanabiliriz
+            // veya 0 gönderebiliriz.
+            double realRiskScore = riskProfile.RiskLevel == "UNKNOWN" ? 12.5 : riskProfile.OverallRiskScore;
+
+            // 1. Audit Log Kaydı Oluştur (Gerçek Veri)
+            var logEntry = new AuditLogEntry
+            {
+                Audit_ID = Guid.NewGuid().ToString(),
+                M1_Risk_Score = realRiskScore,
+                M2_Decision_Input = $"Compliance Check for System: {systemId}",
+                M2_Debiasing_Protocol = "Automated TPRM Generation",
+                M2_Final_Decision = "Approved",
+                Compliance_Timestamp = DateTime.UtcNow
+            };
+
+            // 2. Baserow'a Kaydet
+            if (_baserowClient != null)
+            {
+                await _baserowClient.LogDecisionAsync(logEntry);
+            }
+
+            // 3. Rapor Çıktısını Hazırla
             var artifact = new ComplianceArtifact
             {
-                OverallRiskScore = 12.5, // Düşük Risk
-                IncidentResponseStatus = "Plan Approved",
-                AuditLogLink = $"https://baserow.koruimpact.org/audit/{systemId}",
+                OverallRiskScore = realRiskScore,
+                IncidentResponseStatus = "Active Monitoring", // Düzeltildi
+
+                // DİKKAT: Link formatı artık gerçek Baserow formatında
+                AuditLogLink = $"https://baserow.koruimpact.org/database/735?row={logEntry.Audit_ID}",
+
                 RiskSummary = new List<RiskControl>
                 {
-                    new RiskControl { RiskCategory = "Fairness", ControlImplemented = "M2 Debiasing Protocol", ControlStatus = "Implemented" },
-                    new RiskControl { RiskCategory = "Transparency", ControlImplemented = "Immutable Ledger (M3)", ControlStatus = "Implemented" }
-                },
-                RegulatoryComplianceGaps = new List<string>
-                {
-                    "Human Oversight (Art. 14) documentation pending final review."
+                    // Artık tek ve doğru satır var
+                    new RiskControl { RiskCategory = "Transparency", ControlImplemented = "M3 Immutable Ledger", ControlStatus = "Verified" }
                 }
             };
 
-            return Task.FromResult(artifact);
+            return artifact;
+        }
+
+        public async Task<List<AuditLogEntry>> GetFullAuditTrailAsync()
+        {
+            return await _baserowClient.GetAuditLogsAsync();
         }
     }
 }

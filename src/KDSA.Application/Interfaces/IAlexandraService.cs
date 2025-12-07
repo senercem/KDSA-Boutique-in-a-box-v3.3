@@ -13,5 +13,7 @@ namespace KDSA.Application.Interfaces
 
         // 3. Partner için Uyumluluk Raporu Üret (MANAGE - TPRM Automation)
         Task<ComplianceArtifact> GenerateComplianceArtifactAsync(string systemId);
+
+        Task<List<AuditLogEntry>> GetFullAuditTrailAsync();
     }
 }
