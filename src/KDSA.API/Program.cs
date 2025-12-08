@@ -1,6 +1,9 @@
 using KDSA.Application.Interfaces;
 using KDSA.Infrastructure.Services;
 using Swashbuckle.AspNetCore.Swagger;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -38,6 +41,33 @@ builder.Services.AddScoped<IBaserowClient, BaserowClient>();
 // ACORE Modülü Servisi
 builder.Services.AddScoped<IACOREService, ACOREService>();
 
+// Auth Servisi
+builder.Services.AddScoped<IAuthService, AuthService>();
+
+// JWT Authentication Ayarları
+var jwtSettings = builder.Configuration.GetSection("JwtSettings");
+var key = Encoding.ASCII.GetBytes(jwtSettings["SecretKey"]);
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.RequireHttpsMetadata = false;
+    options.SaveToken = true;
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(key),
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidIssuer = jwtSettings["Issuer"],
+        ValidAudience = jwtSettings["Audience"]
+    };
+});
+
 // --- 3. UYGULAMA İNŞASI ---
 var app = builder.Build();
 
@@ -59,6 +89,10 @@ app.UseAuthorization();
 
 // Controller'ları (API uçlarını) haritala
 app.MapControllers();
+
+// JWT Authentication ve Authorization middleware'leri
+app.UseAuthentication();
+app.UseAuthorization();
 
 // Controller'ları haritalarken hata olursa detayını görmek için try-catch bloğu:
 //try
