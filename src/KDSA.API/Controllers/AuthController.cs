@@ -3,6 +3,7 @@ using KDSA.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System;
+using System.Security.Claims;
 using System.Threading.Tasks;
 
 namespace KDSA.API.Controllers
@@ -48,6 +49,48 @@ namespace KDSA.API.Controllers
             {
                 return Unauthorized(new { message = ex.Message });
             }
+        }
+
+        [HttpPost("change-password")]
+        [Authorize] // Sadece giriş yapmış kullanıcılar şifre değiştirebilir
+        public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto request)
+        {
+            try
+            {
+                await _authService.ChangePasswordAsync(request);
+                return Ok(new { message = "Şifre başarıyla güncellendi." });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpGet("users")]
+        [Authorize]
+        public async Task<IActionResult> GetUsers()
+        {
+            // 1. Token'ın içindeki ROL bilgisini okuyoruz
+            var role = User.FindFirst(ClaimTypes.Role)?.Value;
+
+            // 2. GÜVENLİK KONTROLÜ (Düzeltilmiş Mantık)
+            // Rol boşsa veya ("Admin" DEĞİL VE "admin" DEĞİL) ise engelle.
+            if (string.IsNullOrEmpty(role) || (role != "Admin" && role != "admin"))
+            {
+                return Forbid(); // 403 Forbidden döner
+            }
+
+            var users = await _authService.GetAllUsersAsync();
+            return Ok(users);
+        }
+
+        [HttpDelete("users/{id}")]
+        [Authorize]
+        public async Task<IActionResult> DeleteUser(int id)
+        {
+            var success = await _authService.DeleteUserAsync(id);
+            if (!success) return BadRequest("Kullanıcı silinemedi.");
+            return Ok(new { message = "Kullanıcı silindi." });
         }
     }
 }

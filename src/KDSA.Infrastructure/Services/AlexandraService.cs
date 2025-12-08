@@ -74,6 +74,46 @@ namespace KDSA.Infrastructure.Services
             return artifact;
         }
 
+        public async Task<ComplianceArtifact> GenerateComplianceArtifactAsync(string systemId, string m2Analysis, double m1Score)
+        {
+            // 1. Audit Log Kaydı Oluştur (Artık Dolu Verilerle!)
+            var logEntry = new AuditLogEntry
+            {
+                Audit_ID = Guid.NewGuid().ToString(),
+                M1_Risk_Score = m1Score,
+                M2_Decision_Input = $"System Context: {systemId}",
+                M2_Debiasing_Protocol = "Neurosymbolic Pre-mortem Analysis",
+
+                // İŞTE BURASI: Frontend'den gelen Yapay Zeka çıktısını buraya ve Veritabanına yazıyoruz
+                M2_Final_Decision = string.IsNullOrEmpty(m2Analysis) ? "No Analysis Data Provided" : m2Analysis,
+
+                Compliance_Timestamp = DateTime.UtcNow
+            };
+
+            // 2. Baserow'a Kaydet
+            if (_baserowClient != null)
+            {
+                await _baserowClient.LogDecisionAsync(logEntry);
+            }
+
+            // 3. Rapor Çıktısını Hazırla
+            var artifact = new ComplianceArtifact
+            {
+                OverallRiskScore = m1Score,
+                IncidentResponseStatus = "Active Monitoring",
+                AuditLogLink = $"https://baserow.koruimpact.org/database/186/table/735?row={logEntry.Audit_ID}", // ID'yi düzelttim (735)
+
+                RiskSummary = new List<RiskControl>
+                {
+                    new RiskControl { RiskCategory = "Transparency", ControlImplemented = "M3 Immutable Ledger", ControlStatus = "Verified" },
+                    // M2 Analizini de rapora kontrol maddesi olarak ekliyoruz
+                    new RiskControl { RiskCategory = "Cognitive Bias", ControlImplemented = "M2 Analysis Logged", ControlStatus = "Completed" }
+                }
+            };
+
+            return artifact;
+        }
+
         public async Task<List<AuditLogEntry>> GetFullAuditTrailAsync()
         {
             return await _baserowClient.GetAuditLogsAsync();

@@ -2,6 +2,7 @@
 using KDSA.Domain.Entities;
 using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
+using KDSA.Application.DTOs;
 
 namespace KDSA.API.Controllers
 {
@@ -51,6 +52,15 @@ namespace KDSA.API.Controllers
         {
             var logs = await _alexandraService.GetFullAuditTrailAsync();
             return Ok(logs);
+        }
+
+        // GET metodunu siliyoruz, yerine POST yapıyoruz çünkü veri gönderiyoruz
+        [HttpPost("generate-report")]
+        public async Task<IActionResult> GenerateReport([FromBody] ReportGenerationDto request)
+        {
+            // Servise hem ID'yi hem de M2'den gelen metni gönderiyoruz
+            var artifact = await _alexandraService.GenerateComplianceArtifactAsync(request.SystemId, request.M2AnalysisResult, request.M1RiskScore);
+            return Ok(artifact);
         }
     }
 }

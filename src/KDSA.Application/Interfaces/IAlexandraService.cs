@@ -15,5 +15,7 @@ namespace KDSA.Application.Interfaces
         Task<ComplianceArtifact> GenerateComplianceArtifactAsync(string systemId);
 
         Task<List<AuditLogEntry>> GetFullAuditTrailAsync();
+
+        Task<ComplianceArtifact> GenerateComplianceArtifactAsync(string systemId, string m2Analysis, double m1Score);
     }
 }

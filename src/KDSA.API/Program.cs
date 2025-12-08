@@ -7,41 +7,29 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// --- 1. CORS AYARI (Frontend Erişimi İçin Kritik) ---
-// React/Next.js uygulamanızın (localhost:5173 veya 3000) bu API'ye erişmesine izin verir.
+// --- 1. CORS AYARI ---
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp",
         policy =>
         {
-            policy.WithOrigins("http://localhost:5173", "http://localhost:3000") // Frontend portları
+            policy.WithOrigins("http://localhost:5173", "http://localhost:3000")
                   .AllowAnyHeader()
                   .AllowAnyMethod();
         });
 });
 
-// --- 2. SERVİS KAYITLARI (Dependency Injection) ---
+// --- 2. SERVİS KAYITLARI ---
 
-// Standart Controller servisi
 builder.Services.AddControllers();
-
-// Swagger / OpenAPI (Test arayüzü için)
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// M2: Decision Engine (Gemini AI Servisi)
+// Servisler
 builder.Services.AddScoped<IGeminiService, GeminiService>();
-
-// M3: Alexandra (Compliance / Governance Servisi)
 builder.Services.AddScoped<IAlexandraService, AlexandraService>();
-
-// Infrastructure: Baserow Veritabanı İstemcisi
 builder.Services.AddScoped<IBaserowClient, BaserowClient>();
-
-// ACORE Modülü Servisi
 builder.Services.AddScoped<IACOREService, ACOREService>();
-
-// Auth Servisi
 builder.Services.AddScoped<IAuthService, AuthService>();
 
 // JWT Authentication Ayarları
@@ -72,8 +60,8 @@ builder.Services.AddAuthentication(options =>
 var app = builder.Build();
 
 // --- 4. MIDDLEWARE AYARLARI (İstek İşleme Hattı) ---
+// DİKKAT: Buradaki sıralama hayati önem taşır!
 
-// Geliştirme ortamındaysak Swagger'ı aç
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -82,36 +70,19 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-// ÖNEMLİ: CORS middleware'i Authorization'dan ÖNCE gelmelidir.
+// 1. CORS (En başta olmalı)
 app.UseCors("AllowReactApp");
 
-app.UseAuthorization();
-
-// Controller'ları (API uçlarını) haritala
-app.MapControllers();
-
-// JWT Authentication ve Authorization middleware'leri
+// 2. AUTHENTICATION (Kimlik Kontrolü - "Sen kimsin?")
+// Controller'lara gelmeden önce kimlik tespit edilmeli.
 app.UseAuthentication();
+
+// 3. AUTHORIZATION (Yetki Kontrolü - "Buraya girebilir misin?")
 app.UseAuthorization();
 
-// Controller'ları haritalarken hata olursa detayını görmek için try-catch bloğu:
-//try
-//{
-//    app.MapControllers();
-//}
-//catch (System.Reflection.ReflectionTypeLoadException ex)
-//{
-//    // Hatanın asıl sebebini konsola yazdırıyoruz
-//    foreach (var item in ex.LoaderExceptions)
-//    {
-//        if (item != null)
-//        {
-//            System.Diagnostics.Debug.WriteLine($"KRİTİK HATA: {item.Message}");
-//            Console.WriteLine($"KRİTİK HATA: {item.Message}");
-//        }
-//    }
-//    throw; // Hatayı tekrar fırlat ki uygulama dursun biz de görelim
-//}
+// 4. CONTROLLERS (API Uçları - "İçeri buyur")
+// Güvenlik kontrollerinden geçen istek buraya ulaşır.
+app.MapControllers();
 
 // Uygulamayı başlat
 app.Run();
