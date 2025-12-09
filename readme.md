@@ -46,7 +46,7 @@ To ensure maintainability, flexibility, and ease of integration, the project is 
 -   **`KDSA.Domain`**: The heart of the application. Contains the core business logic and entities, with zero dependencies on the outside world.
 -   **`KDSA.Application`**: Defines the use cases and service interfaces. It dictates _what_ the system can do.
 -   **`KDSA.Infrastructure`**: Implements the interfaces defined in the Application layer. This is where integrations with external services like Google Gemini and Baserow (database) live.
--   **`KDSA.API`**: The outermost layer, exposing the headless REST API endpoints for partners to consume.
+-   **`KDSA.API`**: The outermost layer, exposing the headless REST API endpoints for partners to consume. It includes a secure, JWT-based authentication system for user management.
 
 ### Frontend (Partner Accelerator)
 
@@ -84,7 +84,14 @@ To ensure maintainability, flexibility, and ease of integration, the project is 
     "Baserow": {
       "BaseUrl": "https://baserow.koruimpact.org",
       "ApiToken": "YOUR_BASEROW_API_TOKEN_HERE",
-      "AuditLogTableId": "YOUR_BASEROW_TABLE_ID_HERE"
+      "AuditLogTableId": "YOUR_AUDIT_LOG_TABLE_ID_HERE",
+      "UsersTableId": "YOUR_USERS_TABLE_ID_HERE"
+    },
+    "JwtSettings": {
+      "SecretKey": "YOUR_SUPER_SECRET_KEY_THAT_IS_LONG_AND_SECURE",
+      "Issuer": "KDSA.Backend",
+      "Audience": "KDSA.Frontend",
+      "ExpiryMinutes": 120
     }
     ```
 3.  **Run the backend:**

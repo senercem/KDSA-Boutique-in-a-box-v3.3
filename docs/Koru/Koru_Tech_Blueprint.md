@@ -4,15 +4,15 @@ This document outlines the definitive technical and digital architecture for Kor
 
 The platform is designed as a decoupled, multi-component system (Backend API and separate Frontend website) to ensure independent development, deployment, and scalability.1. Backend Architecture (API)
 
-| Component | Selection | Rationale / Details |
-| :---- | :---- | :---- |
-| **Runtime** | Node.js / TypeScript | Provides a robust, scalable, and maintainable environment for complex business logic. |
-| **Framework** | Express.js | Used to build a **RESTful API** with a layered architecture: routes → services → data layer. |
-| **Database** | Firebase Firestore | Chosen as the **NoSQL database**, serving as the single source of truth. Existing collections include content, user, and company. |
-| **Authentication** | Firebase Authentication | Provides robust user authentication with **JWT tokens** and existing **Role-Based Access Control (RBAC)** middleware (requireRole). |
-| **File Storage** | Firebase Storage | Used for file and image uploads, with a specific focus on storing user-uploaded images under the /contentImages directory. |
-| **External Services** | DeepL API (Primary) / Google Cloud Translation API (Fallback) | Implements an **AI-Powered Translation Workflow** via a new backend endpoint (/api/translate) with a quota management system for cost-efficiency. |
-| **API Docs** | Swagger / OpenAPI | Essential for maintaining documentation of all endpoints, including the likeCount field and new API routes. |
+| Component        | Selection                | Rationale / Details                                                                                                                                            |
+| :--------------- | :----------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Runtime**      | .NET 8 / C#              | Provides a robust, high-performance, and scalable environment for building modern, cloud-native applications.                                                  |
+| **Framework**    | ASP.NET Core             | Used to build a **RESTful API** following **Clean Architecture** principles, separating concerns into Domain, Application, Infrastructure, and API layers.        |
+| **Database**     | Baserow (Self-Hosted)    | Chosen as the primary NoSQL database for operational data, including the immutable audit log and user management, ensuring data sovereignty.                     |
+| **Authentication** | JWT-Based Authentication | Implements a custom JSON Web Token (JWT) based authentication system for securing API endpoints, with Role-Based Access Control (RBAC) for authorization.    |
+| **File Storage** | Not Implemented (Future) | Future implementation will consider services like Azure Blob Storage or AWS S3 for file and image uploads.                                                         |
+| **External Services** | Google Gemini API        | Integrates with Google's Gemini large language model to power the **M2: Decision Engine**, providing advanced analytical and de-biasing capabilities.        |
+| **API Docs**     | Swagger / OpenAPI        | Automatically generates interactive API documentation from the C# controllers and models, ensuring that the API contract is always up-to-date and easy to explore. |
 
 2\. Frontend Architecture (Website & Portal)
 

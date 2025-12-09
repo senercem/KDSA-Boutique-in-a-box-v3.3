@@ -16,26 +16,36 @@ The `KDSA.Infrastructure` layer is where the application connects to the outside
 /src/KDSA.Infrastructure/
 ├── KDSA.Infrastructure.csproj
 └── Services/
+    ├── ACOREService.cs
     ├── AlexandraService.cs
+    ├── AuthService.cs
     ├── BaserowClient.cs
     └── GeminiService.cs
 ```
 
 ### 2.1. `KDSA.Infrastructure.csproj`
-This project file references both `KDSA.Application` (to access the interfaces it needs to implement) and `KDSA.Domain` (to work with the business entities). It also includes external library dependencies, such as `Newtonsoft.Json` for JSON serialization and `Microsoft.Extensions.Configuration` to read configuration values from `appsettings.json`.
+This project file references both `KDSA.Application` (to access the interfaces it needs to implement) and `KDSA.Domain` (to work with the business entities). It also includes external library dependencies, such as `Newtonsoft.Json` for JSON serialization, `Microsoft.Extensions.Configuration` to read configuration values, `BCrypt.Net-Next` for password hashing, and `System.IdentityModel.Tokens.Jwt` for JWT token generation.
 
 ### 2.2. `Services/`
 This directory contains the concrete classes that implement the application's interfaces.
 
+-   **`ACOREService.cs`**: Implements `IACOREService`. It provides a simple in-memory implementation for calculating and storing `ACORERiskProfile` based on `ACOREInputData`.
+
 -   **`AlexandraService.cs`**: Implements `IAlexandraService`.
-    -   **Current State (MVP):** In the current version, this service uses in-memory dictionaries and lists (`_systemContexts`, `_metrics`) to store data. This is a temporary solution to allow development and testing without a persistent database.
-    -   **Future State:** This service will be updated to store and retrieve data from a persistent data store, likely the Baserow database, to ensure data is not lost when the application restarts.
-    -   `GenerateComplianceArtifactAsync`: This method currently returns hard-coded ("mock") data that matches the `ComplianceArtifact` structure. This simulates the generation of a real report.
+    -   **Integration:** This service is now integrated with `IACOREService` to fetch the latest risk score and with `IBaserowClient` to log the complete `AuditLogEntry` to the database.
+    -   `GenerateComplianceArtifactAsync`: This method constructs a full `ComplianceArtifact`, including data from M1 and M2, and logs the entire transaction to Baserow, creating a persistent audit trail.
+
+-   **`AuthService.cs`**: Implements `IAuthService`.
+    -   This service handles all user authentication and management logic.
+    -   It connects to the Baserow API to store and retrieve user data from a dedicated `Users` table.
+    -   It uses `BCrypt.Net-Next` to hash and verify passwords.
+    -   It generates JWT tokens for authenticated users, including claims for username, email, and role.
 
 -   **`BaserowClient.cs`**: Implements `IBaserowClient`.
     -   This class uses `HttpClient` to make REST API calls to the self-hosted Baserow instance.
-    -   It reads the Baserow URL, API Token, and Table ID from the configuration (`appsettings.json`) via `IConfiguration`. This is a best practice to avoid hard-coding secrets in the code.
-    -   `LogDecisionAsync`: This method serializes the `AuditLogEntry` object into the JSON format expected by the Baserow API and sends it via an HTTP POST request. It includes error handling to log any issues with the connection or API response.
+    -   It reads the Baserow URL, API Token, and Table IDs from the configuration (`appsettings.json`).
+    -   `LogDecisionAsync`: Serializes the `AuditLogEntry` object and sends it to the `KDSA_Audit_Log` table in Baserow.
+    -   `GetAuditLogsAsync`: Retrieves all entries from the `KDSA_Audit_Log` table.
 
 -   **`GeminiService.cs`**: Implements `IGeminiService`.
     -   This class also uses `HttpClient` to connect to the Google Gemini API.

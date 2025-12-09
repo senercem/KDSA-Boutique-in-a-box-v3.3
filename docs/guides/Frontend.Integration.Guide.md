@@ -120,9 +120,49 @@ export async function getComplianceArtifact(systemId: string): Promise<Complianc
 }
 
 // ... other functions for registerContext, ingestMetrics etc.
+
+// --- Authentication Functions ---
+
+export async function login(credentials: { email: string; password: string }): Promise<{ token: string; username: string; role: string }> {
+    const response = await fetch(`${API_BASE_URL}/api/Auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(credentials),
+    });
+
+    if (!response.ok) {
+        throw new Error("Login failed");
+    }
+    return response.json();
+}
+
+// Example of a function that requires authentication
+export async function getUsers(token: string): Promise<any[]> {
+    const response = await fetch(`${API_BASE_URL}/api/Auth/users`, {
+        headers: {
+            "Authorization": `Bearer ${token}`
+        }
+    });
+    if (!response.ok) {
+        throw new Error("Failed to fetch users");
+    }
+    return response.json();
+}
 ```
 
-### 4.3. Using TanStack Query in a Component
+### 4.3. Authentication Flow
+
+With the introduction of JWT-based authentication, the frontend application needs to follow a specific flow:
+
+1.  **Login:** The user submits their credentials (email and password) to the `/api/Auth/login` endpoint.
+2.  **Store Token:** If the login is successful, the API returns a JWT token. This token should be stored securely in the frontend application (e.g., in `localStorage`, `sessionStorage`, or a secure cookie).
+3.  **Send Token with Requests:** For every subsequent request to a protected endpoint, the frontend must include the JWT token in the `Authorization` header with the `Bearer` scheme.
+    ```
+    Authorization: Bearer <YOUR_JWT_TOKEN>
+    ```
+4.  **Logout:** To log out, the frontend application should simply delete the stored token. There is no server-side logout endpoint to call.
+
+### 4.4. Using TanStack Query in a Component
 
 With the API client in place, you can use TanStack Query in your React components to fetch data.
 

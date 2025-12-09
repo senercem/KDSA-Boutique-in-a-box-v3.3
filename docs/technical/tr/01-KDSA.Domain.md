@@ -15,14 +15,22 @@
 /src/KDSA.Domain/
 ├── KDSA.Domain.csproj
 └── Entities/
+    ├── ACOREModels.cs
     ├── AlexandraModels.cs
-    └── BaserowEntities.cs
+    ├── BaserowEntities.cs
+    └── User.cs
 ```
 
 ### 2.1. `KDSA.Domain.csproj`
 Bu dosya, projenin .NET 8.0 ile derlendiğini ve temel proje bağımlılıklarını tanımlar. Bu katmanın tek görevi model tanımlamak olduğu için harici bir kütüphane bağımlılığı bulunmaz.
 
-### 2.2. `Entities/AlexandraModels.cs`
+### 2.2. `Entities/ACOREModels.cs`
+Bu dosya, **M1: ACORE (Algılama Katmanı)** için veri yapılarını içerir. Bu modeller, insan faktörü analizinden gelen girdileri ve sonuçta ortaya çıkan risk profilini tanımlar.
+
+-   **`ACOREInputData`**: Psikolojik güvenlik, değişim yorgunluğu, rol belirsizliği ve liderlik güveni gibi metrikleri yakalayan, frontend'den gelen ham veriyi temsil eder.
+-   **`ACORERiskProfile`**: Girdi verilerine dayanarak hesaplanan risk profilini temsil eder. Genel bir risk puanı, bir risk seviyesi (örn. Düşük, Orta, Yüksek) ve kritik ihlallerin bir listesini içerir.
+
+### 2.3. `Entities/AlexandraModels.cs`
 Bu dosya, projenin **M3: Project Alexandra (Yönetişim Katmanı)** modülüyle ilgili veri yapılarını içerir. Bu modeller, AI sistemlerinin yönetişimi ve DORA/EU AI Act gibi regülasyonlara uyumluluk için gerekli olan veri giriş ve çıkışlarını tanımlar.
 
 -   **`AISystemContext`**: Bir yapay zeka sisteminin bağlamını (niyeti, kullanım ortamı, veri kaynakları, sahibi vb.) tanımlayan ana model. Bu, "MAP" fonksiyonunun temel girdisidir.
@@ -31,11 +39,16 @@ Bu dosya, projenin **M3: Project Alexandra (Yönetişim Katmanı)** modülüyle 
 -   **`ComplianceArtifact`**: Sistemin bir iş ortağına sunacağı, denetlenebilir uyumluluk raporunun formatını tanımlayan model. Bu, "MANAGE" fonksiyonunun çıktısıdır.
 -   **`RiskControl`**: `ComplianceArtifact` içinde yer alan, belirli bir risk kategorisine karşı uygulanan kontrolleri ve durumunu özetleyen model.
 
-### 2.3. `Entities/BaserowEntities.cs`
+### 2.4. `Entities/BaserowEntities.cs`
 Bu dosya, projenin operasyonel veritabanı olan Baserow tablolarıyla eşleşen veri yapılarını içerir.
 
 -   **`AuditLogEntry`**: KDSA'in "Golden Thread" akışındaki her bir kararın ve işlemin değiştirilemez kaydını (immutable log) tutmak için tasarlanmış model. Baserow'daki `KDSA_Audit_Log` tablosuna karşılık gelir. Bu model, M1, M2 ve M3 modüllerinden gelen verileri tek bir yerde birleştirir.
 -   **`RegulatoryMatrixItem`**: Hangi regülasyonun (örn: "EU AI Act"), hangi maddesinin (örn: "Article 14"), KDSA'in hangi kontrolüyle (örn: "M1->M2 Pre-Mortem Loop") karşılandığını haritalayan teorik bir model. Bu, denetim süreçlerini otomatize etmek için kullanılır.
+
+### 2.5. `Entities/User.cs`
+Bu dosya, sistemdeki bir kullanıcıyı temsil eden `User` varlığını içerir.
+
+-   **`User`**: `Id`, `Username`, `Email`, `PasswordHash`, `Role` ve `CreatedDate` gibi özellikleri içeren kullanıcı modeli. Bu varlık, kimlik doğrulama ve yetkilendirme için kullanılır.
 
 ## 3. Mimari İlkeler ve Kararlar
 

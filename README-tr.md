@@ -45,7 +45,7 @@ Proje, sürdürülebilirlik, esneklik ve entegrasyon kolaylığı sağlamak amac
 -   **`KDSA.Domain`**: Projenin kalbi. Dış dünyadan tamamen bağımsız, saf iş kurallarını ve varlıkları (Entities) içerir.
 -   **`KDSA.Application`**: İş akışlarını ve servis arayüzlerini (Interfaces) tanımlar. Sistemin "ne yapabildiğini" belirler.
 -   **`KDSA.Infrastructure`**: Dış dünya ile entegrasyonu sağlar. Google Gemini AI, Baserow (veritabanı) gibi harici servislerin somut implementasyonlarını barındırır.
--   **`KDSA.API`**: İş ortaklarının entegre olacağı "Headless" REST API uçlarını (endpoints) sunar.
+-   **`KDSA.API`**: İş ortaklarının entegre olacağı "Headless" REST API uçlarını (endpoints) sunar. Kullanıcı yönetimi için güvenli, JWT tabanlı bir kimlik doğrulama sistemi içerir.
 
 ### Frontend (Partner Simülasyonu)
 
@@ -83,7 +83,14 @@ Proje, sürdürülebilirlik, esneklik ve entegrasyon kolaylığı sağlamak amac
     "Baserow": {
       "BaseUrl": "https://baserow.koruimpact.org",
       "ApiToken": "BURAYA_BASEROW_API_TOKEN_GIRIN",
-      "AuditLogTableId": "BURAYA_BASEROW_TABLO_ID_GIRIN"
+      "AuditLogTableId": "BURAYA_DENETIM_KAYDI_TABLO_ID_GIRIN",
+      "UsersTableId": "BURAYA_KULLANICILAR_TABLO_ID_GIRIN"
+    },
+    "JwtSettings": {
+      "SecretKey": "BURAYA_COK_GIZLI_VE_GUVENLI_ANAHTARINIZI_GIRIN",
+      "Issuer": "KDSA.Backend",
+      "Audience": "KDSA.Frontend",
+      "ExpiryMinutes": 120
     }
     ```
 3.  **Backend'i çalıştırın:**

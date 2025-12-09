@@ -16,26 +16,36 @@
 /src/KDSA.Infrastructure/
 ├── KDSA.Infrastructure.csproj
 └── Services/
+    ├── ACOREService.cs
     ├── AlexandraService.cs
+    ├── AuthService.cs
     ├── BaserowClient.cs
     └── GeminiService.cs
 ```
 
 ### 2.1. `KDSA.Infrastructure.csproj`
-Bu proje dosyası, hem `KDSA.Application` (uygulaması gereken arayüzlere erişmek için) hem de `KDSA.Domain` (iş varlıklarıyla çalışmak için) projelerine referans verir. Ayrıca, JSON serileştirme için `Newtonsoft.Json` ve `appsettings.json`'dan yapılandırma değerlerini okumak için `Microsoft.Extensions.Configuration` gibi harici kütüphane bağımlılıklarını da içerir.
+Bu proje dosyası, hem `KDSA.Application` (uygulaması gereken arayüzlere erişmek için) hem de `KDSA.Domain` (iş varlıklarıyla çalışmak için) projelerine referans verir. Ayrıca, JSON serileştirme için `Newtonsoft.Json`, yapılandırma değerlerini okumak için `Microsoft.Extensions.Configuration`, şifre hashleme için `BCrypt.Net-Next` ve JWT token oluşturma için `System.IdentityModel.Tokens.Jwt` gibi harici kütüphane bağımlılıklarını da içerir.
 
 ### 2.2. `Services/`
 Bu klasör, uygulamanın arayüzlerini implemente eden somut sınıfları içerir.
 
+-   **`ACOREService.cs`**: `IACOREService` arayüzünü implemente eder. `ACOREInputData`'ya dayanarak `ACORERiskProfile`'ı hesaplamak ve saklamak için basit bir bellek içi implementasyon sunar.
+
 -   **`AlexandraService.cs`**: `IAlexandraService` arayüzünü implemente eder.
-    -   **Mevcut Durum (MVP):** Şu anki versiyonda bu servis, verileri saklamak için bellek içi sözlükler ve listeler (`_systemContexts`, `_metrics`) kullanır. Bu, kalıcı bir veritabanı olmadan geliştirme ve test yapmayı sağlayan geçici bir çözümdür.
-    -   **Gelecek Durum:** Bu servis, verilerin uygulama yeniden başlatıldığında kaybolmamasını sağlamak için verileri Baserow veritabanı gibi kalıcı bir veri deposunda saklayacak ve oradan alacak şekilde güncellenecektir.
-    -   `GenerateComplianceArtifactAsync`: Bu metot şu anda `ComplianceArtifact` yapısına uyan, sabit kodlanmış ("mock") veriler döndürmektedir. Bu, gerçek bir rapor oluşturma sürecini simüle eder.
+    -   **Entegrasyon:** Bu servis artık en son risk skorunu çekmek için `IACOREService` ile ve tam `AuditLogEntry`'yi veritabanına kaydetmek için `IBaserowClient` ile entegre çalışır.
+    -   `GenerateComplianceArtifactAsync`: Bu metot, M1 ve M2'den gelen verileri içeren tam bir `ComplianceArtifact` oluşturur ve tüm işlemi Baserow'a kaydederek kalıcı bir denetim izi oluşturur.
+
+-   **`AuthService.cs`**: `IAuthService` arayüzünü implemente eder.
+    -   Bu servis, tüm kullanıcı kimlik doğrulama ve yönetim mantığını ele alır.
+    -   Kullanıcı verilerini özel bir `Users` tablosundan saklamak ve almak için Baserow API'sine bağlanır.
+    -   Şifreleri hashlemek ve doğrulamak için `BCrypt.Net-Next` kullanır.
+    -   Kimliği doğrulanmış kullanıcılar için kullanıcı adı, e-posta ve rol içeren claim'lere sahip JWT token'ları oluşturur.
 
 -   **`BaserowClient.cs`**: `IBaserowClient` arayüzünü implemente eder.
     -   Bu sınıf, kendi kendine barındırılan Baserow örneğine REST API çağrıları yapmak için `HttpClient` kullanır.
-    -   Baserow URL'ini, API Token'ını ve Tablo ID'sini `IConfiguration` aracılığıyla yapılandırma dosyasından (`appsettings.json`) okur. Bu, hassas bilgilerin kodda sabit olarak yazılmamasını sağlayan bir en iyi uygulamadır.
-    -   `LogDecisionAsync`: Bu metot, `AuditLogEntry` nesnesini Baserow API'sinin beklediği JSON formatına serileştirir ve bir HTTP POST isteği ile gönderir. Bağlantı veya API yanıtıyla ilgili herhangi bir sorunu loglamak için hata yönetimi içerir.
+    -   Baserow URL'ini, API Token'ını ve Tablo ID'lerini yapılandırmadan (`appsettings.json`) okur.
+    -   `LogDecisionAsync`: `AuditLogEntry` nesnesini serileştirir ve Baserow'daki `KDSA_Audit_Log` tablosuna gönderir.
+    -   `GetAuditLogsAsync`: `KDSA_Audit_Log` tablosundaki tüm girişleri alır.
 
 -   **`GeminiService.cs`**: `IGeminiService` arayüzünü implemente eder.
     -   Bu sınıf da Google Gemini API'sine bağlanmak için `HttpClient` kullanır.

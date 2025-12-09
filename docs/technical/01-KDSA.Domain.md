@@ -15,14 +15,22 @@
 /src/KDSA.Domain/
 ├── KDSA.Domain.csproj
 └── Entities/
+    ├── ACOREModels.cs
     ├── AlexandraModels.cs
-    └── BaserowEntities.cs
+    ├── BaserowEntities.cs
+    └── User.cs
 ```
 
 ### 2.1. `KDSA.Domain.csproj`
 This file defines that the project is compiled with .NET 8.0 and specifies its base dependencies. As this layer's sole purpose is to define models, it has no external library dependencies.
 
-### 2.2. `Entities/AlexandraModels.cs`
+### 2.2. `Entities/ACOREModels.cs`
+This file contains the data structures for **M1: ACORE (Sensing Layer)**. These models define the inputs from human-factor analysis and the resulting risk profile.
+
+-   **`ACOREInputData`**: Represents the raw data coming from the frontend, capturing metrics like psychological safety, change fatigue, role clarity, and leadership trust.
+-   **`ACORERiskProfile`**: Represents the calculated risk profile based on the input data. It includes an overall risk score, a risk level (e.g., Low, Medium, High), and a list of critical breaches.
+
+### 2.3. `Entities/AlexandraModels.cs`
 This file contains the data structures related to **M3: Project Alexandra (The Governance Layer)**. These models define the necessary data inputs and outputs for the governance of AI systems and compliance with regulations like DORA and the EU AI Act.
 
 -   **`AISystemContext`**: The primary model that defines the context of an AI system (its intended use, deployment environment, data sources, owner, etc.). This is the main input for the "MAP" function.
@@ -31,11 +39,16 @@ This file contains the data structures related to **M3: Project Alexandra (The G
 -   **`ComplianceArtifact`**: The model that defines the format of the auditable compliance report the system will provide to a partner. This is the output of the "MANAGE" function.
 -   **`RiskControl`**: A model within `ComplianceArtifact` that summarizes the controls implemented for a specific risk category and their status.
 
-### 2.3. `Entities/BaserowEntities.cs`
+### 2.4. `Entities/BaserowEntities.cs`
 This file contains data structures that map directly to tables in Baserow, the project's operational database.
 
 -   **`AuditLogEntry`**: This model is designed to hold the immutable record of every decision and action in KDSA's "Golden Thread" flow. It corresponds to the `KDSA_Audit_Log` table in Baserow and consolidates data from the M1, M2, and M3 modules.
 -   **`RegulatoryMatrixItem`**: A theoretical model used to map which regulation (e.g., "EU AI Act") and which article (e.g., "Article 14") is addressed by which KDSA control (e.g., "M1->M2 Pre-Mortem Loop"). This is used to automate audit processes.
+
+### 2.5. `Entities/User.cs`
+This file contains the `User` entity, which represents a user in the system.
+
+-   **`User`**: The model for a user, containing properties like `Id`, `Username`, `Email`, `PasswordHash`, `Role`, and `CreatedDate`. This entity is used for authentication and authorization.
 
 ## 3. Architectural Principles and Decisions
 
