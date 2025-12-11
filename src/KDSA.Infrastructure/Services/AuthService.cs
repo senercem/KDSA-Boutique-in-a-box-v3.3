@@ -38,29 +38,53 @@ namespace KDSA.Infrastructure.Services
 
         public async Task<AuthResponseDto> RegisterAsync(RegisterDto request)
         {
-            // İSİM İLE KONTROL (user_field_names=true)
-            // 'Email' sütun adını kullanıyoruz
+            // LOG: Neyi arıyoruz?
+            Debug.WriteLine($"[REGISTER CHECK] Aranan Email: {request.Email}");
+
+            // URL'i oluştur
             var checkUrl = $"/api/database/rows/table/{_tableId}/?user_field_names=true&filter__field_Email__equal={request.Email}";
 
             var checkResponse = await _httpClient.GetAsync(checkUrl);
-            var checkJson = JObject.Parse(await checkResponse.Content.ReadAsStringAsync());
+            var responseContent = await checkResponse.Content.ReadAsStringAsync();
 
+            // LOG: Baserow ne cevap verdi?
+            Debug.WriteLine($"[REGISTER RESPONSE] Baserow Cevabı: {responseContent}");
+
+            var checkJson = JObject.Parse(responseContent);
+
+            // KONTROL MANTIĞI GÜNCELLEMESİ
+            // Sadece results dolu mu diye bakmak yetmez, dönen kaydın maili gerçekten bizimki mi?
             if (checkJson["results"] != null && checkJson["results"].HasValues)
             {
-                throw new Exception("Bu e-posta adresi zaten kayıtlı.");
+                // Eğer filtre çalışmadıysa ve tüm tabloyu döndürdüyse, manuel kontrol yapalım:
+                bool reallyExists = false;
+                foreach (var row in checkJson["results"])
+                {
+                    string existingEmail = row["Email"]?.ToString();
+                    if (string.Equals(existingEmail, request.Email, StringComparison.OrdinalIgnoreCase))
+                    {
+                        reallyExists = true;
+                        break;
+                    }
+                }
+
+                if (reallyExists)
+                {
+                    throw new Exception($"Bu e-posta adresi ({request.Email}) zaten kayıtlı.");
+                }
             }
 
+            // ... KODUN GERİ KALANI AYNI ...
             string passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
 
-            // İSİM İLE KAYIT
             var payload = new Dictionary<string, object>
-            {
-                { "Username", request.Username },
-                { "Email", request.Email },
-                { "PasswordHash", passwordHash },
-                { "Role", string.IsNullOrEmpty(request.Role) ? "User" : request.Role },
-                { "CreatedDate", DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ") }
-            };
+    {
+        { "Username", request.Username },
+        { "Email", request.Email },
+        { "PasswordHash", passwordHash },
+        { "Role", string.IsNullOrEmpty(request.Role) ? "User" : request.Role },
+        { "CreatedDate", DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ") }
+    };
 
             var jsonContent = new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
             var response = await _httpClient.PostAsync($"/api/database/rows/table/{_tableId}/?user_field_names=true", jsonContent);

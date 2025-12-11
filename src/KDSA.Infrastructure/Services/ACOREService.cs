@@ -1,53 +1,93 @@
-﻿using KDSA.Application.Interfaces;
-using KDSA.Domain.Entities;
-using System.Collections.Generic; // Dictionary için gerekli
-using System.Threading.Tasks;
-
+﻿using System.Net.Http.Json; // GetFromJsonAsync için gerekli
+using KDSA.Application.Interfaces; // IACOREService için gerekli
+using ACOREResult = KDSA.Core.Models.ACOREResult; // ACOREInputDto için gerekli
+using ACOREInputDto = KDSA.Core.DTOs.ACOREInputDto; // Namespace hatası almamak için global ekledik
 namespace KDSA.Infrastructure.Services
 {
     public class ACOREService : IACOREService
     {
-        // "static" olduğu için Backend kapanmadığı sürece veriyi tutar.
-        private static readonly Dictionary<string, ACORERiskProfile> _riskProfiles = new();
+        private readonly HttpClient _httpClient;
 
-        public Task<ACORERiskProfile> AnalyzeAndStoreAsync(ACOREInputData data)
+        // Constructor
+        public ACOREService(HttpClient httpClient)
         {
-            // --- BASİT RİSK HESAPLAMA MANTIĞI ---
-            // 0-100 arası puan. (100 = En Yüksek Risk)
-            // PsychSafety: Düşükse risk. (100 - Değer)
-            // ChangeFatigue: Yüksekse risk. (Değer)
-            // ...
-
-            double score = 0;
-            score += (100 - data.PsychSafety);
-            score += data.ChangeFatigue;
-            score += (100 - data.RoleClarity);
-            score += (100 - data.LeadershipTrust);
-
-            double averageRisk = score / 4.0;
-
-            var profile = new ACORERiskProfile
-            {
-                OverallRiskScore = averageRisk,
-                RiskLevel = averageRisk > 75 ? "CRITICAL" : (averageRisk > 50 ? "HIGH" : "LOW"),
-                CriticalBreaches = new List<string>() // Şimdilik boş
-            };
-
-            // Hafızaya Kaydet
-            _riskProfiles[data.SystemId] = profile;
-
-            return Task.FromResult(profile);
+            _httpClient = httpClient;
         }
 
-        public Task<ACORERiskProfile> GetLatestRiskProfileAsync(string systemId)
+        // 1. Metot: M1 Modülünden veri çeken asenkron metot
+        public async Task<ACOREResult> GetLatestRiskProfileAsync(string systemId)
         {
-            if (_riskProfiles.ContainsKey(systemId))
-            {
-                return Task.FromResult(_riskProfiles[systemId]);
-            }
+            // URL'i kendi M1 modül adresinize göre düzenleyin
+            string requestUrl = $"api/m1/risk-profiles/{systemId}";
 
-            // Veri yoksa varsayılan dön
-            return Task.FromResult(new ACORERiskProfile { OverallRiskScore = 0, RiskLevel = "UNKNOWN" });
+            try
+            {
+                var result = await _httpClient.GetFromJsonAsync<ACOREResult>(requestUrl);
+                return result ?? new ACOREResult();
+            }
+            catch
+            {
+                // Hata durumunda null veya boş nesne dönebilirsiniz
+                return null;
+            }
+        }
+
+        // 2. Metot: (Eksik olan buydu) - Hesaplama Metodu
+        public ACOREResult CalculateATRI(ACOREInputDto input)
+        {
+            // 1. Veri Kontrolü
+            if (input == null) return new ACOREResult();
+
+            // 2. RİSK HESAPLAMA MANTIĞI (Basit ve Etkili Bir Formül)
+            // -------------------------------------------------------
+            // Mantık:
+            // - Psychological Safety (Düşükse Kötü -> Risk artar)
+            // - Role Clarity (Düşükse Kötü -> Risk artar)
+            // - Leadership Trust (Düşükse Kötü -> Risk artar)
+            // - Change Fatigue (Yüksekse Kötü -> Risk artar)
+
+            // Risk Puanlarını hesaplayalım (Hepsi 0-100 üzerinden risk puanına dönüşür)
+            double riskFromSafety = 100 - input.PsychologicalSafety; // 25 ise -> 75 Risk
+            double riskFromClarity = 100 - input.RoleClarity;        // 24 ise -> 76 Risk
+            double riskFromTrust = 100 - input.LeadershipTrust;      // 26 ise -> 74 Risk
+            // Fatigue düşükse risk düşsün (doğru orantı).
+            double riskFromFatigue = input.ChangeFatigue;            // 82 ise -> 82 Risk (Aynen alınır)
+
+            // Ortalama Risk Skoru (Ağırlıklı ortalama da yapılabilir, şimdilik düz ortalama)
+            double calculatedRiskScore = (riskFromSafety + riskFromClarity + riskFromTrust + riskFromFatigue) / 4.0;
+
+            // 3. Risk Seviyesini Belirleme (Thresholds)
+            string level = "LOW";
+            if (calculatedRiskScore >= 75) level = "CRITICAL";      // Kritik
+            else if (calculatedRiskScore >= 50) level = "HIGH";     // Yüksek
+            else if (calculatedRiskScore >= 25) level = "MEDIUM";   // Orta
+
+            // 4. Sonuç Nesnesini Oluşturma
+            var result = new ACOREResult
+            {
+                Id = Guid.NewGuid().ToString(), // Rastgele bir işlem ID'si
+
+                // Hesaplanan skor (Decimal ve Double olarak)
+                Score = (decimal)calculatedRiskScore,
+                OverallRiskScore = calculatedRiskScore,
+
+                // Hesaplanan Seviye
+                RiskLevel = level,
+                RiskZone = level, // Zone bilgisi de aynı olsun
+
+                // Risk Bayrağı (Örn: 50'nin üzerindeyse risk var diyelim)
+                RiskFlag = calculatedRiskScore > 50,
+
+                // Açıklama
+                Description = $"Analiz başarıyla tamamlandı. Tespit edilen ortalama risk skoru: {calculatedRiskScore:F1}",
+
+                // Dayanıklılık Puanı (Riskin tersi)
+                ResilienceScore = (decimal)(100 - calculatedRiskScore),
+
+                CalculatedAt = DateTime.Now
+            };
+
+            return result;
         }
     }
 }

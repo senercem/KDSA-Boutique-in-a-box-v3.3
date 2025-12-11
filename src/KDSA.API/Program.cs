@@ -26,11 +26,14 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 // Servisler
-builder.Services.AddScoped<IGeminiService, GeminiService>();
+// builder.Services.AddScoped<IGeminiService, GeminiService>();
 builder.Services.AddScoped<IAlexandraService, AlexandraService>();
 builder.Services.AddScoped<IBaserowClient, BaserowClient>();
-builder.Services.AddScoped<IACOREService, ACOREService>();
+// builder.Services.AddScoped<IACOREService, ACOREService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+
+builder.Services.AddHttpClient<IGeminiService, GeminiService>();
+builder.Services.AddHttpClient<IACOREService, ACOREService>();
 
 // JWT Authentication Ayarları
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
