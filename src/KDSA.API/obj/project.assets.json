@@ -340,6 +340,7 @@
         "type": "project",
         "framework": ".NETCoreApp,Version=v9.0",
         "dependencies": {
+          "KDSA.Core": "1.0.0",
           "KDSA.Domain": "1.0.0"
         },
         "compile": {
@@ -347,6 +348,19 @@
         },
         "runtime": {
           "bin/placeholder/KDSA.Application.dll": {}
+        }
+      },
+      "KDSA.Core/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v9.0",
+        "dependencies": {
+          "Newtonsoft.Json": "13.0.4"
+        },
+        "compile": {
+          "bin/placeholder/KDSA.Core.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/KDSA.Core.dll": {}
         }
       },
       "KDSA.Domain/1.0.0": {
@@ -365,6 +379,7 @@
         "dependencies": {
           "BCrypt.Net-Next": "4.0.3",
           "KDSA.Application": "1.0.0",
+          "KDSA.Core": "1.0.0",
           "KDSA.Domain": "1.0.0",
           "Microsoft.Extensions.Configuration.Abstractions": "10.0.0",
           "Newtonsoft.Json": "13.0.4",
@@ -1151,6 +1166,11 @@
       "type": "project",
       "path": "../KDSA.Application/KDSA.Application.csproj",
       "msbuildProject": "../KDSA.Application/KDSA.Application.csproj"
+    },
+    "KDSA.Core/1.0.0": {
+      "type": "project",
+      "path": "../KDSA.Core/KDSA.Core.csproj",
+      "msbuildProject": "../KDSA.Core/KDSA.Core.csproj"
     },
     "KDSA.Domain/1.0.0": {
       "type": "project",

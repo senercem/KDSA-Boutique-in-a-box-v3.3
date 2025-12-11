@@ -10,6 +10,7 @@
   <ItemGroup>
     <ProjectReference Include="..\KDSA.Application\KDSA.Application.csproj" />
     <ProjectReference Include="..\KDSA.Domain\KDSA.Domain.csproj" />
+	<ProjectReference Include="..\KDSA.Core\KDSA.Core.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
