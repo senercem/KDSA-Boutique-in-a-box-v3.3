@@ -1,19 +1,19 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IdentityModel.Tokens.Jwt;
-using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Security.Claims;
-using System.Text;
-using System.Threading.Tasks;
-using BCrypt.Net;
+﻿using BCrypt.Net;
 using KDSA.Application.DTOs;
 using KDSA.Application.Interfaces;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.IdentityModel.Tokens.Jwt;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Security.Claims;
+using System.Text;
+using System.Threading.Tasks;
 
 namespace KDSA.Infrastructure.Services
 {
@@ -28,39 +28,39 @@ namespace KDSA.Infrastructure.Services
             _configuration = configuration;
             _httpClient = new HttpClient();
 
-            _httpClient.BaseAddress = new Uri(_configuration["Baserow:BaseUrl"]);
+            var baseUrl = _configuration["Baserow:BaseUrl"];
             var apiToken = _configuration["Baserow:ApiToken"];
             _tableId = _configuration["Baserow:UsersTableId"]; // Table 736
+
+            if (!string.IsNullOrEmpty(baseUrl))
+            {
+                _httpClient.BaseAddress = new Uri(baseUrl);
+            }
 
             _httpClient.DefaultRequestHeaders.Authorization =
                 new AuthenticationHeaderValue("Token", apiToken);
         }
 
+        // 1. REGISTER (KAYIT)
         public async Task<AuthResponseDto> RegisterAsync(RegisterDto request)
         {
             // LOG: Neyi arıyoruz?
             Debug.WriteLine($"[REGISTER CHECK] Aranan Email: {request.Email}");
 
-            // URL'i oluştur
+            // Email kontrolü
             var checkUrl = $"/api/database/rows/table/{_tableId}/?user_field_names=true&filter__field_Email__equal={request.Email}";
-
             var checkResponse = await _httpClient.GetAsync(checkUrl);
             var responseContent = await checkResponse.Content.ReadAsStringAsync();
-
-            // LOG: Baserow ne cevap verdi?
-            Debug.WriteLine($"[REGISTER RESPONSE] Baserow Cevabı: {responseContent}");
-
             var checkJson = JObject.Parse(responseContent);
 
-            // KONTROL MANTIĞI GÜNCELLEMESİ
-            // Sadece results dolu mu diye bakmak yetmez, dönen kaydın maili gerçekten bizimki mi?
+            // KONTROL MANTIĞI: Gerçekten bu email var mı?
             if (checkJson["results"] != null && checkJson["results"].HasValues)
             {
-                // Eğer filtre çalışmadıysa ve tüm tabloyu döndürdüyse, manuel kontrol yapalım:
                 bool reallyExists = false;
                 foreach (var row in checkJson["results"])
                 {
-                    string existingEmail = row["Email"]?.ToString();
+                    // Esnek okuma
+                    string existingEmail = row["Email"]?.ToString() ?? row["email"]?.ToString();
                     if (string.Equals(existingEmail, request.Email, StringComparison.OrdinalIgnoreCase))
                     {
                         reallyExists = true;
@@ -74,17 +74,17 @@ namespace KDSA.Infrastructure.Services
                 }
             }
 
-            // ... KODUN GERİ KALANI AYNI ...
+            // Şifre Hashleme
             string passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
 
             var payload = new Dictionary<string, object>
-    {
-        { "Username", request.Username },
-        { "Email", request.Email },
-        { "PasswordHash", passwordHash },
-        { "Role", string.IsNullOrEmpty(request.Role) ? "User" : request.Role },
-        { "CreatedDate", DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ") }
-    };
+            {
+                { "Username", request.Username },
+                { "Email", request.Email },
+                { "PasswordHash", passwordHash },
+                { "Role", string.IsNullOrEmpty(request.Role) ? "User" : request.Role },
+                { "CreatedDate", DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ") }
+            };
 
             var jsonContent = new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
             var response = await _httpClient.PostAsync($"/api/database/rows/table/{_tableId}/?user_field_names=true", jsonContent);
@@ -95,89 +95,136 @@ namespace KDSA.Infrastructure.Services
                 throw new Exception($"Kayıt başarısız: {error}");
             }
 
-            return GenerateJwtToken(request.Username, request.Email, "User");
+            return GenerateJwtToken(request.Username, request.Email, request.Role ?? "User");
         }
 
+        // 2. LOGIN (GİRİŞ)
         public async Task<AuthResponseDto> LoginAsync(LoginDto request)
-        {
-            // İSİM İLE GİRİŞ
-            // 'Email' sütununda arama yapıyoruz
-            var searchUrl = $"/api/database/rows/table/{_tableId}/?user_field_names=true&filter__field_Email__equal={request.Email}";
-
-            var response = await _httpClient.GetAsync(searchUrl);
-            if (!response.IsSuccessStatusCode) throw new Exception("Baserow bağlantı hatası.");
-
-            var json = JObject.Parse(await response.Content.ReadAsStringAsync());
-            var results = json["results"];
-
-            if (results == null || !results.HasValues) throw new Exception("Kullanıcı bulunamadı.");
-
-            var userRow = results[0];
-
-            // İSİM İLE OKUMA
-            string storedHash = userRow["PasswordHash"]?.ToString();
-            string username = userRow["Username"]?.ToString();
-            string role = userRow["Role"]?.ToString() ?? "User";
-
-            if (string.IsNullOrEmpty(storedHash) || !BCrypt.Net.BCrypt.Verify(request.Password, storedHash))
-            {
-                throw new Exception("Şifre hatalı.");
-            }
-
-            return GenerateJwtToken(username, request.Email, role);
-        }
-
-        public async Task<List<UserDto>> GetAllUsersAsync()
         {
             try
             {
-                Debug.WriteLine($"[USER LIST] Tablo ID: {_tableId} taranıyor...");
+                // URL (Filtreli istek atıyoruz ama güvenmiyoruz)
+                var searchUrl = $"/api/database/rows/table/{_tableId}/?user_field_names=true&filter__field_Email__equal={request.Email}";
 
-                // İSİM İLE LİSTELEME
-                var response = await _httpClient.GetAsync($"/api/database/rows/table/{_tableId}/?user_field_names=true");
+                var response = await _httpClient.GetAsync(searchUrl);
+                if (!response.IsSuccessStatusCode) throw new Exception("Baserow bağlantı hatası.");
 
-                if (!response.IsSuccessStatusCode)
-                {
-                    Debug.WriteLine($"[HATA] {response.StatusCode}");
-                    return new List<UserDto>();
-                }
-
-                var json = JObject.Parse(await response.Content.ReadAsStringAsync());
+                var content = await response.Content.ReadAsStringAsync();
+                var json = JObject.Parse(content);
                 var results = json["results"];
 
-                Debug.WriteLine($"[USER LIST] {results?.Count()} kayıt bulundu.");
+                if (results == null || !results.HasValues) throw new Exception("Kullanıcı bulunamadı.");
 
-                var users = new List<UserDto>();
+                // --- DÜZELTME BURADA ---
+                // results[0] diyerek körü körüne ilk kaydı almıyoruz.
+                // Döngüyle veya LINQ ile e-postası eşleşen DOĞRU kişiyi buluyoruz.
+
+                JToken userRow = null;
+
                 foreach (var row in results)
                 {
-                    // JSON'dan İsimle Okuyoruz
-                    users.Add(new UserDto
+                    // Email'i hem büyük hem küçük harf alan adıyla dene
+                    string dbEmail = row["Email"]?.ToString() ?? row["email"]?.ToString();
+
+                    if (string.Equals(dbEmail, request.Email, StringComparison.OrdinalIgnoreCase))
                     {
-                        Id = (int)row["id"],
-                        Username = row["Username"]?.ToString(),
-                        Email = row["Email"]?.ToString(),
-                        Role = row["Role"]?.ToString(),
-                        CreatedDate = row["CreatedDate"]?.ToString()
-                    });
+                        userRow = row;
+                        break; // Bulduk!
+                    }
                 }
-                return users;
+
+                if (userRow == null)
+                {
+                    // Eğer API sonuç döndürdü ama bizim aradığımız kişi içinde yoksa
+                    // (Örn: filtre çalışmadı ve alakasız kayıtlar geldi)
+                    throw new Exception("Kullanıcı bulunamadı (E-posta eşleşmedi).");
+                }
+
+                // Buradan sonrası aynı...
+                Debug.WriteLine($"[LOGIN DEBUG] Bulunan Kullanıcı: {request.Email}");
+                Debug.WriteLine($"[LOGIN DEBUG] DB Satırı: {userRow}");
+
+                string storedHash = userRow["PasswordHash"]?.ToString() ?? userRow["passwordHash"]?.ToString();
+                string username = userRow["Username"]?.ToString() ?? userRow["username"]?.ToString();
+                string role = userRow["Role"]?.ToString() ?? userRow["role"]?.ToString() ?? "User";
+
+                if (string.IsNullOrEmpty(storedHash))
+                {
+                    throw new Exception("Sistem hatası: Şifre verisi bozuk.");
+                }
+
+                bool isValid = BCrypt.Net.BCrypt.Verify(request.Password, storedHash);
+
+                if (!isValid)
+                {
+                    Debug.WriteLine($"[LOGIN ERROR] Şifre uyuşmadı!");
+                    throw new Exception("Şifre hatalı.");
+                }
+
+                return GenerateJwtToken(username, request.Email, role);
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[EXCEPTION] {ex.Message}");
-                return new List<UserDto>();
+                Debug.WriteLine($"[LOGIN EXCEPTION] {ex.Message}");
+                throw;
             }
         }
 
-        public async Task<bool> DeleteUserAsync(int rowId)
+        // 3. TÜM KULLANICILARI GETİR
+        public async Task<List<UserDto>> GetAllUsersAsync()
         {
-            var response = await _httpClient.DeleteAsync($"/api/database/rows/table/{_tableId}/{rowId}/");
-            return response.IsSuccessStatusCode;
+            var users = new List<UserDto>();
+            try
+            {
+                var requestUrl = $"{_configuration["Baserow:BaseUrl"]}/api/database/rows/table/{_tableId}/?user_field_names=true";
+
+                Debug.WriteLine($"[AUTH SERVICE] Kullanıcılar çekiliyor: {requestUrl}");
+
+                _httpClient.DefaultRequestHeaders.Authorization =
+                    new AuthenticationHeaderValue("Token", _configuration["Baserow:ApiToken"]);
+
+                var response = await _httpClient.GetAsync(requestUrl);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    Debug.WriteLine($"[AUTH SERVICE ERROR] Status: {response.StatusCode}");
+                    return users;
+                }
+
+                var content = await response.Content.ReadAsStringAsync();
+                var json = JObject.Parse(content);
+                var results = json["results"];
+
+                if (results == null) return users;
+
+                foreach (var item in results)
+                {
+                    // ESNEK MAPPING: Hem Büyük Hem Küçük Harf Dene
+                    var username = item["Username"]?.ToString() ?? item["username"]?.ToString() ?? "Unknown";
+                    var email = item["Email"]?.ToString() ?? item["email"]?.ToString() ?? "-";
+                    var role = item["Role"]?.ToString() ?? item["role"]?.ToString() ?? "User";
+                    var createdDate = item["CreatedDate"]?.ToString() ?? item["createdDate"]?.ToString() ?? DateTime.Now.ToString("yyyy-MM-dd");
+
+                    users.Add(new UserDto
+                    {
+                        Id = (int)item["id"],
+                        Username = username,
+                        Email = email,
+                        Role = role,
+                        CreatedDate = createdDate
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[GetAllUsers EXCEPTION]: {ex.Message}");
+            }
+            return users;
         }
 
+        // 4. ŞİFRE DEĞİŞTİRME
         public async Task<bool> ChangePasswordAsync(ChangePasswordDto request)
         {
-            // Şifre değiştirirken de İsim kullanıyoruz
             var searchUrl = $"/api/database/rows/table/{_tableId}/?user_field_names=true&filter__field_Email__equal={request.Email}";
             var response = await _httpClient.GetAsync(searchUrl);
             var json = JObject.Parse(await response.Content.ReadAsStringAsync());
@@ -187,11 +234,14 @@ namespace KDSA.Infrastructure.Services
 
             var userRow = results[0];
             int rowId = (int)userRow["id"];
-            string storedHash = userRow["PasswordHash"]?.ToString();
+
+            // ESNEK OKUMA: Eski şifreyi kontrol ederken de lazım
+            string storedHash = userRow["PasswordHash"]?.ToString() ?? userRow["passwordHash"]?.ToString();
 
             if (!BCrypt.Net.BCrypt.Verify(request.OldPassword, storedHash)) throw new Exception("Eski şifre hatalı.");
 
             string newHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+
             var payload = new Dictionary<string, object> { { "PasswordHash", newHash } };
             var jsonContent = new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
 
@@ -200,20 +250,40 @@ namespace KDSA.Infrastructure.Services
             return updateResponse.IsSuccessStatusCode;
         }
 
+        // 5. KULLANICI SİL
+        public async Task<bool> DeleteUserAsync(int rowId)
+        {
+            var response = await _httpClient.DeleteAsync($"/api/database/rows/table/{_tableId}/{rowId}/");
+            return response.IsSuccessStatusCode;
+        }
+
+        // JWT TOKEN ÜRETİCİ
         private AuthResponseDto GenerateJwtToken(string username, string email, string role)
         {
             var jwtSettings = _configuration.GetSection("JwtSettings");
             var key = Encoding.ASCII.GetBytes(jwtSettings["SecretKey"]);
+
             var tokenDescriptor = new SecurityTokenDescriptor
             {
-                Subject = new ClaimsIdentity(new[] { new Claim(ClaimTypes.Name, username), new Claim(ClaimTypes.Email, email), new Claim(ClaimTypes.Role, role) }),
+                Subject = new ClaimsIdentity(new[]
+                {
+                    new Claim(ClaimTypes.Name, username),
+                    new Claim(ClaimTypes.Email, email),
+                    new Claim(ClaimTypes.Role, role)
+                }),
                 Expires = DateTime.UtcNow.AddMinutes(double.Parse(jwtSettings["ExpiryMinutes"])),
                 Issuer = jwtSettings["Issuer"],
                 Audience = jwtSettings["Audience"],
                 SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
             };
+
             var tokenHandler = new JwtSecurityTokenHandler();
-            return new AuthResponseDto { Token = tokenHandler.WriteToken(tokenHandler.CreateToken(tokenDescriptor)), Username = username, Role = role };
+            return new AuthResponseDto
+            {
+                Token = tokenHandler.WriteToken(tokenHandler.CreateToken(tokenDescriptor)),
+                Username = username,
+                Role = role
+            };
         }
     }
 }

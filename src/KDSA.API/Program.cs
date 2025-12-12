@@ -26,11 +26,10 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 // Servisler
-// builder.Services.AddScoped<IGeminiService, GeminiService>();
 builder.Services.AddScoped<IAlexandraService, AlexandraService>();
 builder.Services.AddScoped<IBaserowClient, BaserowClient>();
-// builder.Services.AddScoped<IACOREService, ACOREService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IComplianceService, ComplianceService>();
 
 builder.Services.AddHttpClient<IGeminiService, GeminiService>();
 builder.Services.AddHttpClient<IACOREService, ACOREService>();
@@ -39,6 +38,16 @@ builder.Services.AddHttpClient<IACOREService, ACOREService>();
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
 var key = Encoding.ASCII.GetBytes(jwtSettings["SecretKey"]);
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll",
+        builder =>
+        {
+            builder.AllowAnyOrigin()
+                   .AllowAnyMethod()
+                   .AllowAnyHeader();
+        });
+});
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;

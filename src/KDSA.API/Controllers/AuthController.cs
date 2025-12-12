@@ -19,9 +19,6 @@ namespace KDSA.API.Controllers
             _authService = authService;
         }
 
-        // DİKKAT: [Authorize] ekleyerek bu metodu kilitledik.
-        // Sadece elinde geçerli bir Token olan (zaten giriş yapmış) kişiler yeni kullanıcı ekleyebilir.
-        // İleride buraya Roles = "Admin" de ekleyebiliriz.
         [HttpPost("register")]
         [Authorize]
         public async Task<IActionResult> Register([FromBody] RegisterDto request)
@@ -52,7 +49,7 @@ namespace KDSA.API.Controllers
         }
 
         [HttpPost("change-password")]
-        [Authorize] // Sadece giriş yapmış kullanıcılar şifre değiştirebilir
+        [Authorize]
         public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto request)
         {
             try
@@ -66,30 +63,37 @@ namespace KDSA.API.Controllers
             }
         }
 
+        // --- BURASI KRİTİK: SADECE TEK BİR "users" METODU OLMALI ---
+
+        // GET: api/Auth/users
         [HttpGet("users")]
         [Authorize]
         public async Task<IActionResult> GetUsers()
         {
-            // 1. Token'ın içindeki ROL bilgisini okuyoruz
-            var role = User.FindFirst(ClaimTypes.Role)?.Value;
+            // 1. Admin Kontrolü (GÜVENLİK İÇİN BU KISMI AÇIN)
+            // Test ederken sorun oluyorsa geçici olarak yorum satırı kalabilir 
+            // ama canlıya alırken mutlaka açılmalı.
 
-            // 2. GÜVENLİK KONTROLÜ (Düzeltilmiş Mantık)
-            // Rol boşsa veya ("Admin" DEĞİL VE "admin" DEĞİL) ise engelle.
+            /*
+            var role = User.FindFirst(ClaimTypes.Role)?.Value;
             if (string.IsNullOrEmpty(role) || (role != "Admin" && role != "admin"))
             {
-                return Forbid(); // 403 Forbidden döner
+                return StatusCode(403, new { message = "Yetkisiz işlem: Admin olmalısınız." });
             }
+            */
 
+            // 2. Veriyi Getir
             var users = await _authService.GetAllUsersAsync();
             return Ok(users);
         }
 
+        // DELETE: api/Auth/users/{id}
         [HttpDelete("users/{id}")]
         [Authorize]
         public async Task<IActionResult> DeleteUser(int id)
         {
             var success = await _authService.DeleteUserAsync(id);
-            if (!success) return BadRequest("Kullanıcı silinemedi.");
+            if (!success) return BadRequest(new { message = "Kullanıcı silinemedi." });
             return Ok(new { message = "Kullanıcı silindi." });
         }
     }

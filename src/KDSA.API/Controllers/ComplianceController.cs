@@ -3,6 +3,7 @@ using KDSA.Domain.Entities;
 using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
 using KDSA.Application.DTOs;
+using Microsoft.AspNetCore.Authorization; // [Authorize] için gerekli
 
 namespace KDSA.API.Controllers
 {
@@ -11,12 +12,20 @@ namespace KDSA.API.Controllers
     [ApiController]
     public class ComplianceController : ControllerBase
     {
+        // MEVCUT SERVİS (M3 Dashboard Listesi vb. için)
         private readonly IAlexandraService _alexandraService;
 
-        public ComplianceController(IAlexandraService alexandraService)
+        // YENİ EKLENEN SERVİS (Tekil Kanıt İndirme için)
+        private readonly IComplianceService _complianceService;
+
+        // Constructor'ı güncelliyoruz: İkisini de içeri alıyoruz
+        public ComplianceController(IAlexandraService alexandraService, IComplianceService complianceService)
         {
             _alexandraService = alexandraService;
+            _complianceService = complianceService;
         }
+
+        // --- MEVCUT METOTLAR (DOKUNULMADI) ---
 
         // POST api/v1/compliance/context
         [HttpPost("context")]
@@ -38,7 +47,6 @@ namespace KDSA.API.Controllers
         }
 
         // GET api/v1/compliance/artifact/{systemId}
-        // Bu endpoint, Partnerin TPRM sürecini otomatize eder.
         [HttpGet("artifact/{systemId}")]
         public async Task<IActionResult> GetComplianceArtifact(string systemId)
         {
@@ -54,13 +62,31 @@ namespace KDSA.API.Controllers
             return Ok(logs);
         }
 
-        // GET metodunu siliyoruz, yerine POST yapıyoruz çünkü veri gönderiyoruz
+        // POST api/v1/compliance/generate-report
         [HttpPost("generate-report")]
         public async Task<IActionResult> GenerateReport([FromBody] ReportGenerationDto request)
         {
-            // Servise hem ID'yi hem de M2'den gelen metni gönderiyoruz
             var artifact = await _alexandraService.GenerateComplianceArtifactAsync(request.SystemId, request.M2AnalysisResult, request.M1RiskScore);
             return Ok(artifact);
+        }
+
+        // --- METOT (Evidence Download İçin) ---
+
+        // GET api/v1/compliance/logs/{auditId}
+        // Frontend'deki "İndir" butonu buraya istek atacak
+        [HttpGet("logs/{auditId}")]
+        [Authorize] // Güvenlik için sadece token sahibi erişebilsin
+        public async Task<IActionResult> GetLogById(string auditId)
+        {
+            // Yeni yazdığımız ComplianceService üzerinden veritabanına gidiyoruz
+            var log = await _complianceService.GetAuditLogByIdAsync(auditId);
+
+            if (log == null)
+            {
+                return NotFound(new { message = $"Audit ID ({auditId}) ile eşleşen kayıt bulunamadı." });
+            }
+
+            return Ok(log);
         }
     }
 }
