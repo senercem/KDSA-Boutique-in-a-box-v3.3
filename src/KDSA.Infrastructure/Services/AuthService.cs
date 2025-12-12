@@ -230,9 +230,21 @@ namespace KDSA.Infrastructure.Services
             var json = JObject.Parse(await response.Content.ReadAsStringAsync());
             var results = json["results"];
 
-            if (results == null || !results.HasValues) throw new Exception("Kullanıcı bulunamadı.");
+            JToken userRow = null;
+            foreach (var row in results)
+            {
+                string dbEmail = row["Email"]?.ToString() ?? row["email"]?.ToString();
+                if (string.Equals(dbEmail, request.Email, StringComparison.OrdinalIgnoreCase))
+                {
+                    userRow = row;
+                    break;
+                }
+            }
 
-            var userRow = results[0];
+            if (userRow == null)
+            {
+                throw new Exception("Kullanıcı bulunamadı (E-posta eşleşmedi).");
+            }
             int rowId = (int)userRow["id"];
 
             // ESNEK OKUMA: Eski şifreyi kontrol ederken de lazım
