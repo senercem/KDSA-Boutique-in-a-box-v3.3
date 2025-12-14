@@ -1,42 +1,42 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Threading.Tasks;
+﻿using KDSA.Application.DTOs;
 using KDSA.Application.Interfaces;
 using Microsoft.Extensions.Configuration;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using System.Diagnostics; // LOGLAMA İÇİN EKLENDİ
-
-using AuditLogEntry = KDSA.Application.DTOs.AuditLogEntry;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq; // Filtreleme (Where) için gerekli
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Threading.Tasks;
 
 namespace KDSA.Infrastructure.Services
 {
     public class ComplianceService : IComplianceService
     {
         private readonly HttpClient _httpClient;
-        private readonly IConfiguration _configuration;
         private readonly string _tableId;
 
         public ComplianceService(IConfiguration configuration)
         {
-            _configuration = configuration;
             _httpClient = new HttpClient();
-            var baseUrl = _configuration["Baserow:BaseUrl"];
-            var apiToken = _configuration["Baserow:ApiToken"];
-            _tableId = _configuration["Baserow:AuditLogTableId"];
+            var baseUrl = configuration["Baserow:BaseUrl"];
+            var apiToken = configuration["Baserow:ApiToken"];
+            _tableId = configuration["Baserow:AuditLogTableId"]; // ID: 735
 
             if (!string.IsNullOrEmpty(baseUrl)) _httpClient.BaseAddress = new Uri(baseUrl);
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Token", apiToken);
         }
 
-        public async Task<List<AuditLogEntry>> GetAuditLogsAsync()
+        // 1. LOGLARI GETİR (Filtreli)
+        public async Task<List<AuditLogEntry>> GetAuditLogsAsync(string userCompany = null)
         {
             try
             {
-                var url = $"/api/database/rows/table/{_tableId}/?user_field_names=true&order_by=-Compliance_Timestamp";
-
-                // LOG: İstek atılıyor
+                // Baserow'dan tüm veriyi çek (Sıralama parametresini kaldırdık, hata vermemesi için)
+                var url = $"/api/database/rows/table/{_tableId}/?user_field_names=true";
                 Debug.WriteLine($"[BASEROW REQUEST] URL: {url}");
 
                 var response = await _httpClient.GetAsync(url);
@@ -48,9 +48,6 @@ namespace KDSA.Infrastructure.Services
                     return new List<AuditLogEntry>();
                 }
 
-                // LOG: Gelen veriyi görelim (Field isimleri neymiş?)
-                Debug.WriteLine($"[BASEROW RESPONSE] {jsonString}");
-
                 var json = JObject.Parse(jsonString);
                 var results = json["results"];
 
@@ -59,7 +56,17 @@ namespace KDSA.Infrastructure.Services
                 {
                     logs.Add(MapToDto(row));
                 }
-                return logs;
+
+                // --- FİLTRELEME MANTIĞI ---
+                // Eğer kullanıcı Admin (Koru Impact) değilse, sadece kendi firmasının loglarını görsün.
+                if (!string.IsNullOrEmpty(userCompany) && userCompany != "Koru")
+                {
+                    // Backend taraflı filtreleme
+                    logs = logs.Where(l => l.Company == userCompany).ToList();
+                }
+
+                // Tarihe göre yeniden (Memory'de) sırala (En yeni en üstte)
+                return logs.OrderByDescending(l => l.Timestamp).ToList();
             }
             catch (Exception ex)
             {
@@ -68,91 +75,61 @@ namespace KDSA.Infrastructure.Services
             }
         }
 
-        public async Task<AuditLogEntry> GetAuditLogByIdAsync(string auditId)
+        // 2. YENİ LOG EKLE (Company Parametresi Eklendi)
+        public async Task<bool> LogAsync(string action, string details, string performedBy, string company)
         {
             try
             {
-                var url = $"/api/database/rows/table/{_tableId}/?user_field_names=true&filter__Audit_ID__equal={auditId}";
-
-                // Hata Ayıklama İçin Log (Output penceresinde görebilirsiniz)
-                Debug.WriteLine($"[BASEROW SINGLE FETCH] URL: {url}");
-
-                var response = await _httpClient.GetAsync(url);
-                var jsonString = await response.Content.ReadAsStringAsync();
-
-                if (!response.IsSuccessStatusCode)
+                var payload = new Dictionary<string, object>
                 {
-                    Debug.WriteLine($"[BASEROW ERROR] {response.StatusCode}");
-                    return null;
-                }
+                    { "Module", "System" }, // Varsayılan modül
+                    { "Action", action },
+                    { "Details", details },
+                    { "PerformedBy", performedBy },
+                    { "Compliance_Timestamp", DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ") },
+                    // YENİ ALAN: Firma bilgisini de kaydediyoruz
+                    { "Company", company ?? "Unknown" }
+                };
 
-                var json = JObject.Parse(jsonString);
-                var results = json["results"];
+                var content = new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
+                var response = await _httpClient.PostAsync($"/api/database/rows/table/{_tableId}/?user_field_names=true", content);
 
-                if (results == null || !results.HasValues)
-                {
-                    Debug.WriteLine($"[BASEROW WARNING] Kayıt bulunamadı. ID: {auditId}");
-                    return null;
-                }
-
-                // İlk eşleşen kaydı al ve dönüştür
-                return MapToDto(results[0]);
+                return response.IsSuccessStatusCode;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[GetLogById Error] {ex.Message}");
-                return null;
+                Debug.WriteLine($"[LOG EXCEPTION] {ex.Message}");
+                return false;
             }
         }
 
-        // ESNEK MAPPING (Her ihtimali dener)
-        private AuditLogEntry MapToDto(JToken row)
+        public async Task<AuditLogEntry> GetAuditLogByIdAsync(string auditId)
         {
-            return new AuditLogEntry
-            {
-                Id = row["id"]?.ToString(),
-                Audit_ID = row["Audit_ID"]?.ToString() ?? row["id"]?.ToString(),
-                Timestamp = DateTime.TryParse(row["Compliance_Timestamp"]?.ToString(), out DateTime dt) ? dt : DateTime.UtcNow,
-
-                Module = row["Module"]?.ToString() ?? "M3 Governance",
-                Action = row["Action"]?.ToString() ?? "Log Entry",
-
-                // Eğer Details boşsa ama M2_Final_Decision doluysa, onu Details yerine de kullanabiliriz.
-                Details = row["Details"]?.ToString() ?? "",
-
-                M2_Debiasing_Protocol = row["M2_Debiasing_Protocol"]?.ToString(),
-                Hash = row["Hash"]?.ToString(),
-                PreviousHash = row["PreviousHash"]?.ToString(),
-                ComplianceTags = ParseTags(row["ComplianceTags"]),
-
-                // --- YENİ EKLENEN EŞLEŞTİRME ---
-                // Baserow'daki sütun adı tam olarak "M2_Final_Decision"
-                M2_Final_Decision = row["M2_Final_Decision"]?.ToString()
-            };
-        }
-
-        // Yardımcı: Birden fazla anahtar ismini dener, bulduğunu alır
-        private string GetValue(JToken row, params string[] keys)
-        {
-            foreach (var key in keys)
-            {
-                if (row[key] != null) return row[key].ToString();
-            }
+            // Şimdilik null dönebiliriz, detay sayfası kullanılmıyorsa
             return null;
         }
 
-        private DateTime ParseDate(string dateStr)
+        // Yardımcı Metot: Baserow JSON -> C# Nesnesi
+        private AuditLogEntry MapToDto(JToken row)
         {
-            if (string.IsNullOrEmpty(dateStr)) return DateTime.UtcNow;
-            return DateTime.TryParse(dateStr, out DateTime dt) ? dt : DateTime.UtcNow;
-        }
+            DateTime parsedDate = DateTime.MinValue;
+            var dateStr = row["Compliance_Timestamp"]?.ToString();
+            if (!string.IsNullOrEmpty(dateStr))
+            {
+                DateTime.TryParse(dateStr, out parsedDate);
+            }
 
-        private List<string> ParseTags(JToken tagsToken)
-        {
-            if (tagsToken == null) return new List<string>();
-            if (tagsToken.Type == JTokenType.Array) return tagsToken.ToObject<List<string>>();
-            if (tagsToken.Type == JTokenType.Object && tagsToken["value"] != null) return new List<string> { tagsToken["value"].ToString() };
-            return new List<string> { tagsToken.ToString() };
+            return new AuditLogEntry
+            {
+                Id = (int)row["id"],
+                Module = row["Module"]?.ToString(),
+                Action = row["Action"]?.ToString(),
+                Details = row["Details"]?.ToString(),
+                PerformedBy = row["PerformedBy"]?.ToString(),
+                Timestamp = parsedDate,
+                // Baserow'dan "Company" alanını okuyoruz (Esnek okuma)
+                Company = row["Company"]?.ToString()
+            };
         }
     }
 }

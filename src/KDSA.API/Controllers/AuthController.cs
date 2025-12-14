@@ -88,7 +88,7 @@ namespace KDSA.API.Controllers
         }
 
         // DELETE: api/Auth/users/{id}
-        [HttpDelete("users/{id}")]
+        [HttpPut("users/{id}")]
         [Authorize]
         public async Task<IActionResult> DeleteUser(int id)
         {

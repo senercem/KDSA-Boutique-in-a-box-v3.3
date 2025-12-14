@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 
 namespace KDSA.Application.DTOs
@@ -6,12 +7,13 @@ namespace KDSA.Application.DTOs
     public class AuditLogEntry
     {
         // Baserow'un kendi satır ID'si
-        public string Id { get; set; }
+        public int Id { get; set; }
 
         // Bizim oluşturduğumuz UUID (Transaction ID)
         public string Audit_ID { get; set; }
 
         // Tarih
+        [JsonProperty("Compliance_Timestamp")]
         public DateTime Timestamp { get; set; }
 
         // Modül İsmi (M1, M2, M3)
@@ -37,5 +39,12 @@ namespace KDSA.Application.DTOs
 
         // M2 Aşaması için Ek Alanlar
         public string M2_Final_Decision { get; set; }
+
+        // Şirket Bilgisi
+        public string Company { get; set; }
+
+        // İşlemi Yapan Kullanıcı
+        [JsonProperty("PerformedBy")]
+        public string PerformedBy { get; set; }
     }
 }

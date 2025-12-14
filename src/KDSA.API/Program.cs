@@ -21,7 +21,7 @@ builder.Services.AddCors(options =>
 
 // --- 2. SERVİS KAYITLARI ---
 
-builder.Services.AddControllers();
+builder.Services.AddControllers().AddNewtonsoftJson();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -33,6 +33,8 @@ builder.Services.AddScoped<IComplianceService, ComplianceService>();
 
 builder.Services.AddHttpClient<IGeminiService, GeminiService>();
 builder.Services.AddHttpClient<IACOREService, ACOREService>();
+
+builder.Services.AddScoped<ICompanyService, CompanyService>();
 
 // JWT Authentication Ayarları
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");

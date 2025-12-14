@@ -3,29 +3,30 @@ using KDSA.Domain.Entities;
 using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
 using KDSA.Application.DTOs;
-using Microsoft.AspNetCore.Authorization; // [Authorize] için gerekli
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims; // User Identity erişimi için gerekli
 
 namespace KDSA.API.Controllers
 {
     // PROTOKOL: Versioning Requirement (/api/v1/...)
+    // NOT: Frontend URL'inin de buna uyması gerekecek: /api/v1/Compliance/logs
     [Route("api/v1/[controller]")]
     [ApiController]
     public class ComplianceController : ControllerBase
     {
-        // MEVCUT SERVİS (M3 Dashboard Listesi vb. için)
+        // MEVCUT SERVİS
         private readonly IAlexandraService _alexandraService;
 
-        // YENİ EKLENEN SERVİS (Tekil Kanıt İndirme için)
+        // YENİ EKLENEN SERVİS (Filtreleme ve Detaylar için)
         private readonly IComplianceService _complianceService;
 
-        // Constructor'ı güncelliyoruz: İkisini de içeri alıyoruz
         public ComplianceController(IAlexandraService alexandraService, IComplianceService complianceService)
         {
             _alexandraService = alexandraService;
             _complianceService = complianceService;
         }
 
-        // --- MEVCUT METOTLAR (DOKUNULMADI) ---
+        // --- MEVCUT METOTLAR ---
 
         // POST api/v1/compliance/context
         [HttpPost("context")]
@@ -55,10 +56,28 @@ namespace KDSA.API.Controllers
         }
 
         // GET api/v1/compliance/logs
+        // GÜNCELLEME: Firma Filtreleme Mantığı Buraya Eklendi
         [HttpGet("logs")]
+        [Authorize] // Güvenlik eklendi
         public async Task<IActionResult> GetAuditLogs()
         {
-            var logs = await _alexandraService.GetFullAuditTrailAsync();
+            // 1. Kullanıcıyı tanı
+            var userEmail = User.FindFirst(ClaimTypes.Email)?.Value ?? User.Identity?.Name;
+            if (string.IsNullOrEmpty(userEmail)) return Unauthorized();
+
+            // 2. Firmayı belirle
+            string userCompany = null;
+            if (userEmail.Contains("koruimpact.org") || userEmail.Contains("admin"))
+            {
+                userCompany = "Koru"; // Veritabanındaki isimle eşleşmeli
+            }
+            else
+            {
+                userCompany = "Unknown"; // Diğerleri için boş liste döner
+            }
+
+            // 3. Updated servisi çağır (_complianceService filtrelemeyi biliyor)
+            var logs = await _complianceService.GetAuditLogsAsync(userCompany);
             return Ok(logs);
         }
 
@@ -70,15 +89,11 @@ namespace KDSA.API.Controllers
             return Ok(artifact);
         }
 
-        // --- METOT (Evidence Download İçin) ---
-
         // GET api/v1/compliance/logs/{auditId}
-        // Frontend'deki "İndir" butonu buraya istek atacak
         [HttpGet("logs/{auditId}")]
-        [Authorize] // Güvenlik için sadece token sahibi erişebilsin
+        [Authorize]
         public async Task<IActionResult> GetLogById(string auditId)
         {
-            // Yeni yazdığımız ComplianceService üzerinden veritabanına gidiyoruz
             var log = await _complianceService.GetAuditLogByIdAsync(auditId);
 
             if (log == null)

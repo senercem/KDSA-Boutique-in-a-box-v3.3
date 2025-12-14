@@ -83,7 +83,8 @@ namespace KDSA.Infrastructure.Services
                 { "Email", request.Email },
                 { "PasswordHash", passwordHash },
                 { "Role", string.IsNullOrEmpty(request.Role) ? "User" : request.Role },
-                { "CreatedDate", DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ") }
+                { "CreatedDate", DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ") },
+                { "Company", string.IsNullOrEmpty(request.Company) ? "Koru" : request.Company }
             };
 
             var jsonContent = new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
@@ -204,6 +205,7 @@ namespace KDSA.Infrastructure.Services
                     var email = item["Email"]?.ToString() ?? item["email"]?.ToString() ?? "-";
                     var role = item["Role"]?.ToString() ?? item["role"]?.ToString() ?? "User";
                     var createdDate = item["CreatedDate"]?.ToString() ?? item["createdDate"]?.ToString() ?? DateTime.Now.ToString("yyyy-MM-dd");
+                    var company = item["Company"]?.ToString() ?? item["company"]?.ToString() ?? "Koru";
 
                     users.Add(new UserDto
                     {
@@ -211,7 +213,8 @@ namespace KDSA.Infrastructure.Services
                         Username = username,
                         Email = email,
                         Role = role,
-                        CreatedDate = createdDate
+                        CreatedDate = createdDate,
+                        Company = company
                     });
                 }
             }
