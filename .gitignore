@@ -103,6 +103,8 @@ StyleCopReport.xml
 *.pidb
 *.svclog
 *.scc
+obj/
+bin/
 
 # Chutzpah Test files
 _Chutzpah*
@@ -482,3 +484,14 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+/src/KDSA.Application/obj/KDSA.Application.csproj.nuget.dgspec.json
+/src/KDSA.API/obj/KDSA.API.csproj.nuget.dgspec.json
+/src/KDSA.API/obj/project.assets.json
+/src/KDSA.API/obj/project.nuget.cache
+/src/KDSA.Application/obj/project.assets.json
+/src/KDSA.Application/obj/project.nuget.cache
+/src/KDSA.API/KDSA.API.csproj
+/src/KDSA.API/appsettings.json
+/src/KDSA.Infrastructure/obj/KDSA.Infrastructure.csproj.nuget.dgspec.json
+/src/KDSA.Infrastructure/obj/project.assets.json
+/src/KDSA.Infrastructure/obj/project.nuget.cache
