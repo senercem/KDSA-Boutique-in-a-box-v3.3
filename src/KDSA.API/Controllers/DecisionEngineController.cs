@@ -1,4 +1,5 @@
 ﻿using KDSA.Application.Interfaces;
+using KDSA.Core.DTOs;
 using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
 
@@ -16,23 +17,28 @@ namespace KDSA.API.Controllers
         }
 
         [HttpPost("analyze")]
-        public async Task<IActionResult> Analyze([FromBody] AnalysisRequest request)
+        public async Task<IActionResult> Analyze([FromBody] DecisionInputDto input)
         {
-            if (string.IsNullOrEmpty(request.Context))
-                return BadRequest("Analiz edilecek bir bağlam (Context) girmelisiniz.");
+            // 1. Validasyon: Karar metni boşsa işlem yapma
+            if (input == null || string.IsNullOrWhiteSpace(input.DecisionContext))
+            {
+                return BadRequest("Analiz edilecek bir karar bağlamı (Strategic Decision) girmelisiniz.");
+            }
 
-            // Playbook v3.3 M2: Karar Motoru Mantığı
-            var prompt = $"Sen Koru Impact KDSA mimarisinin Karar Motorusun. Şu durumu analiz et: {request.Context}";
+            // 2. Prompt Hazırlığı: M2 Modülü için özel prompt
+            // Hem kararı hem de bilinen riskleri birleştirip yapay zekaya soruyoruz.
+            var prompt = $"Sen Koru Impact KDSA mimarisinin 'Pre-mortem' Karar Motorusun.\n" +
+                         $"Analiz Edilecek Stratejik Karar: {input.DecisionContext}\n" +
+                         $"Bilinen Riskler: {input.KnownRisks ?? "Belirtilmemiş"}\n\n" +
+                         "Lütfen bu karar için detaylı bir pre-mortem analizi yap ve olası başarısızlık senaryolarını listele.";
 
+            // 3. Servis Çağrısı
             var result = await _geminiService.AnalyzeRiskAsync(prompt);
 
-            return Ok(new { Analysis = result });
+            // 4. Sonuç
+            // Frontend genellikle doğrudan sonucu bekler, o yüzden { Analysis = ... } wrapper'ını kaldırdım.
+            // Eğer Frontend JSON içinde "Analysis" field'ı bekliyorsa eski haline çevirebiliriz.
+            return Ok(result);
         }
-    }
-
-    // Basit bir istek modeli
-    public class AnalysisRequest
-    {
-        public string Context { get; set; }
     }
 }

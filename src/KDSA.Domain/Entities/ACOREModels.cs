@@ -1,26 +1,36 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace KDSA.Domain.Entities
+﻿namespace KDSA.Domain.Entities
 {
-    // Frontend'den (ACOREModule.tsx) gelecek ham veri
-    public class ACOREInputData
+    // v3.4 Playbook - Appendix F.1 Data Structures
+    public class ACOREInputDto
     {
-        public string SystemId { get; set; } // Örn: "SYS-001"
-        public int PsychSafety { get; set; }    // 0-100 (Düşük olması risk)
-        public int ChangeFatigue { get; set; }  // 0-100 (Yüksek olması risk)
-        public int RoleClarity { get; set; }    // 0-100 (Düşük olması risk)
-        public int LeadershipTrust { get; set; } // 0-100 (Düşük olması risk)
+        // Mevcut Frontend'i bozmamak için eski alanları tutuyoruz (Geriye Uyumluluk)
+        public double PsychologicalSafety { get; set; }
+        public double ChangeFatigue { get; set; }
+
+        // --- v3.4 YENİ PARAMETRELER (Appendix I) ---
+        // Eğer Frontend'den gelmezse varsayılan değerleri kullanacağız.
+
+        // ORS II: Organizational Resilience (Environment) - Weight 30%
+        public double ORS_Score { get; set; } = 50;
+
+        // RACQ: Adaptive Capacity (Individual) - Weight 30%
+        public double RACQ_Score { get; set; } = 50;
+
+        // Simulation: Behavioral Validation (Behavior) - Weight 40%
+        public double Simulation_Score { get; set; } = 50;
+
+        // SCARF: Neural Threat/Reward (Neural) - Coefficient Modifier
+        public double SCARF_Score { get; set; } = 50;
     }
 
-    // Hesaplama sonucu oluşacak risk profili
-    public class ACORERiskProfile
+    public class ACOREResult
     {
-        public double OverallRiskScore { get; set; } // 0-100 Arası Risk Puanı
-        public string RiskLevel { get; set; } // Low, Medium, High, Critical
-        public List<string> CriticalBreaches { get; set; } = new List<string>();
+        public double ResilienceScore { get; set; } // ATRI Score
+        public string RiskZone { get; set; }        // Ambidextrous, Resilient, Strained, Critical
+        public bool RiskFlag { get; set; }          // Golden Thread Tetikleyicisi
+        public List<string> LimitingFactors { get; set; } // "Neural Brake", "Environment Cap" vb.
+
+        // v3.4 Detayları
+        public string Recommendation { get; set; }
     }
 }
